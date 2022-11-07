@@ -1,0 +1,79 @@
+pragma solidity ^0.4.25;
+
+contract CrowdFundingFactory{
+    address[] public deployedCampaigns;
+    
+    function createCampaign(uint minimum) public {
+        address newCampaign = new CrowdFunding_Ethtreum(minimum,msg.sender);
+        deployedCampaigns.push(newCampaign);
+    }
+    function deployedCampaigns() public view returns(address[]){
+        return deployedCampaigns;
+    }
+}
+
+contract CrowdFunding_Ethtreum{
+    
+    struct Withdrawal{
+        string description;
+        uint value;
+        address receipient;
+        bool complete;
+        uint approvalCount;
+        mapping(address => bool) approvals;
+    }
+    
+    Withdrawal[] public withdrawals;
+    address public owner;
+    mapping(address => bool) contributors;
+    uint public contributorsCount;
+    uint public minimumContribution;
+    
+    constructor(uint minimum, address creator) public {
+        owner = creator;
+        minimumContribution = minimum;
+    }
+    function contribute() public payable{
+        require( msg.value >= minimumContribution);
+        contributors[msg.sender] = true;
+        contributorsCount++;
+    }
+    modifier onlyOwner(){
+        require(msg.sender == owner);
+        _;
+    }
+    modifier onlyContributor(){
+        require(contributors[msg.sender]);
+        _;
+    }
+    
+    function createWithdrawals(string description, uint value, address receipient) public onlyOwner{
+        Withdrawal memory newWithdrawal = Withdrawal({
+            description: description,
+            value : value,
+            receipient : receipient,
+            complete :false,
+            approvalCount: 0
+        });
+        withdrawals.push(newWithdrawal);
+    }
+    function approveWithdrawal(uint index) public onlyContributor
+    {
+        Withdrawal storage withdrawal = withdrawals[index];
+        require(!withdrawal.approvals[msg.sender]);
+        withdrawal.approvals[msg.sender] = true;
+        withdrawal.approvalCount++;
+    }
+    
+    function finalizeWithdrawal(uint index) public onlyOwner{
+    Withdrawal storage withdrawal = withdrawals[index];
+    
+    require(withdrawal.approvalCount >= (contributorsCount / 2));
+    require(!withdrawal.complete);
+    
+    withdrawal.receipient.transfer(withdrawal.value);
+    withdrawal.complete = true;
+    }
+    
+    
+}
